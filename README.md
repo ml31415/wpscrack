@@ -5,21 +5,22 @@ PoC implementation of a brute force attack against WPS - PIN External Registrar
 My test environment was Backtrack 5R1 + an Atheros USB adapter.
 I used a mac80211/carl9170 driver but any mac80211-based driver should be ok.
 
-Original version: Stefan Viehböck
+Original version: Stefan Viehböck  
 Minor improvements: Michael Löffler
 
 Dependencies
 ------------
-PyCrypto
-Scapy (2.2.0) (does not come with Backtrack)
+* PyCrypto
+* Scapy (2.2.0) (does not come with Backtrack)
 
 Usage
 -----
-iwconfig mon0 channel X
-./wpscrack.py --iface mon0 --client 94:0c:6d:88:00:00 --bssid f4:ec:38:cf:00:00 --ssid testap -v
+    iwconfig mon0 channel X
+    ./wpscrack.py --iface mon0 --client 94:0c:6d:88:00:00 --bssid f4:ec:38:cf:00:00 --ssid testap -v
 
-further usage:
-./wpscrack.py --help
+Show further usage parameters:
+
+    ./wpscrack.py --help
 
 References
 ----------
