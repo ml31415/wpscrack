@@ -547,7 +547,7 @@ class WPSCrack:
             # append checksum
             accum = 0
             t = pin_int
-            while (t):
+            while t:
                 accum += 3 * (t % 10)
                 t /= 10
                 accum += t % 10
@@ -623,6 +623,8 @@ def get_random_mac(mac):
 
 def main():
     wps = WPSCrack()
+    signal.signal(signal.SIGINT, wps.abort)
+    
     parser = optparse.OptionParser('usage: %prog --iface=IFACE --client=CLIENT_MAC --bssid=BSSID --ssid=SSID [optional arguments]')
     parser.add_option('-i', '--iface', dest='iface', default='mon0', type='string', help='network interface (monitor mode)')
     parser.add_option('-c', '--client', dest='client_mac', default='', type='string', help='MAC of client interface')
@@ -647,8 +649,6 @@ def main():
         wps.verbose = options.verbose
         wps.pin = options.start_pin
         
-        signal.signal(signal.SIGHUP, wps.abort)
-        signal.signal(signal.SIGINT, wps.abort)
         wps.run()
     else:
         print 'check arguments or use --help!'
