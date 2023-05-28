@@ -24,6 +24,6 @@ Show further usage parameters:
 
 References
 ----------
-http://sviehb.wordpress.com/2011/12/27/wi-fi-protected-setup-pin-brute-force-vulnerability/
-http://download.microsoft.com/download/a/f/7/af7777e5-7dcd-4800-8a0a-b18336565f5b/WCN-Netspec.doc
-http://hostap.epitest.fi/wpa_supplicant/
+- http://sviehb.wordpress.com/2011/12/27/wi-fi-protected-setup-pin-brute-force-vulnerability/
+- http://download.microsoft.com/download/a/f/7/af7777e5-7dcd-4800-8a0a-b18336565f5b/WCN-Netspec.doc
+- http://hostap.epitest.fi/wpa_supplicant/
